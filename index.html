@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>周末咖啡补给站</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; background: #0a0604; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #fff5d6; user-select: none; -webkit-user-select: none; }
+
+  .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .phone { position: relative; width: min(100vw, 100vh * 9 / 16); aspect-ratio: 9/16; max-width: 480px; background: #1a0f08; overflow: hidden; box-shadow: 0 0 80px rgba(212, 175, 55, 0.15); }
+
+  /* Background = middle panel (clean café scene) */
+  .bg { position: absolute; inset: 0; background: url('middle-panel-9x16.png') center/cover no-repeat; }
+
+  /* Soft vignette */
+  .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%); pointer-events: none; }
+
+  /* Top header */
+  .header { position: absolute; top: 3%; left: 0; right: 0; z-index: 5; padding: 0 4%; display: flex; justify-content: space-between; align-items: flex-start; }
+  .logo { flex: 1; padding-right: 10px; }
+  .logo-title { font-size: clamp(20px, 4.2vw, 28px); font-weight: 900; line-height: 1; color: #ffd86b; text-shadow: 0 0 12px rgba(255, 200, 80, 0.6), 0 2px 4px rgba(0,0,0,0.8); letter-spacing: 1px; }
+  .logo-sub { font-size: clamp(10px, 2vw, 13px); color: #e8c985; margin-top: 4px; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
+
+  .nav-btns { display: grid; grid-template-columns: repeat(2, 36px); gap: 6px; }
+  .nav-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(20, 12, 8, 0.85); border: 1.5px solid #d4af37; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 600; transition: transform 0.15s, background 0.15s; }
+  .nav-btn:active { transform: scale(0.9); background: rgba(40, 25, 15, 0.95); }
+
+  /* 5 cards in arc layout: C1 C3 C5 C4 C2 (left to right)
+     Order: 基础 经典 至尊 豪华 精品 */
+  .cards { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-10%); height: 32%; display: flex; align-items: flex-end; justify-content: center; gap: 1.2%; padding: 0 3%; z-index: 4; pointer-events: none; }
+  .card { position: relative; pointer-events: auto; cursor: pointer; transition: transform 0.2s, filter 0.2s; flex-shrink: 0; }
+  .card:active { transform: translateY(-4px) scale(1.03); }
+  .card.selected { filter: drop-shadow(0 0 12px gold); transform: translateY(-6px); }
+  .card-inner { position: relative; padding: 4% 6% 6%; border-radius: 8px; text-align: center; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+  .card-name { font-size: clamp(10px, 1.9vw, 13px); font-weight: 700; margin-bottom: 4%; }
+  .card-discount { font-size: clamp(14px, 3vw, 20px); font-weight: 900; line-height: 1.1; margin: 2% 0; }
+  .card-prob { font-size: clamp(10px, 2vw, 13px); font-weight: 700; opacity: 0.95; }
+  .card-icon { font-size: clamp(20px, 4.5vw, 30px); margin-bottom: 4%; }
+
+  /* Tier colors matching the triptych */
+  .tier-outer { width: 14%; background: linear-gradient(180deg, #6b4423 0%, #3d2814 50%, #1f1409 100%); border: 2px solid #3d2814; }
+  .tier-outer .card-name { color: #d4b87a; }
+  .tier-outer .card-discount { color: #ffd86b; }
+  .tier-outer .card-prob { color: #c9a96a; }
+
+  .tier-mid { width: 16%; background: linear-gradient(180deg, #8b6914 0%, #5c4410 50%, #2d1f08 100%); border: 2px solid #8b6914; }
+  .tier-mid .card-name { color: #ffe5a0; }
+  .tier-mid .card-discount { color: #fff2b8; }
+  .tier-mid .card-prob { color: #e8c985; }
+
+  .tier-center { width: 19%; background: linear-gradient(180deg, #d4a857 0%, #8b6914 30%, #5c4410 70%, #2d1f08 100%); border: 3px solid #ffd86b; box-shadow: inset 0 0 0 2px rgba(255, 215, 100, 0.4), 0 0 16px rgba(255, 200, 80, 0.4), 0 6px 20px rgba(0,0,0,0.6) !important; }
+  .tier-center .card-name { color: #fff5d6; }
+  .tier-center .card-discount { color: #ffd86b; font-size: clamp(18px, 4vw, 26px); }
+  .tier-center .card-prob { color: #fff2b8; }
+  .tier-center::before { content: '👑'; position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 18px; filter: drop-shadow(0 0 4px gold); }
+
+  .arc-up { transform: translateY(-12px); }
+
+  /* Bottom hint + buttons */
+  .footer { position: absolute; bottom: 3%; left: 0; right: 0; z-index: 5; padding: 0 4%; }
+  .hint { text-align: center; color: #ffe5a0; font-size: clamp(11px, 2.2vw, 14px); text-shadow: 0 0 8px rgba(255, 200, 80, 0.6), 0 1px 2px rgba(0,0,0,0.9); margin-bottom: 12px; letter-spacing: 1px; }
+  .actions { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 12px 0; border-radius: 999px; font-size: clamp(13px, 2.6vw, 16px); font-weight: 700; cursor: pointer; text-align: center; border: none; transition: transform 0.15s, filter 0.15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: linear-gradient(180deg, #f4d578 0%, #d4a857 50%, #8b6914 100%); color: #2d1f08; border: 2px solid #ffd86b; box-shadow: 0 0 12px rgba(255, 200, 80, 0.5), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .btn-secondary { background: linear-gradient(180deg, #3d2814 0%, #1f1409 100%); color: #e8c985; border: 1.5px solid #6b4423; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .modal-backdrop.show { display: flex; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal { background: linear-gradient(180deg, #2d1f08 0%, #1a0f04 100%); border: 2px solid #d4af37; border-radius: 16px; padding: 24px 20px; max-width: 320px; width: 100%; text-align: center; position: relative; box-shadow: 0 0 40px rgba(212, 175, 55, 0.3); animation: popIn 0.3s ease; }
+  @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-close { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #d4af37; font-size: 22px; cursor: pointer; padding: 4px 8px; }
+  .modal-title { color: #ffd86b; font-size: 18px; font-weight: 800; margin-bottom: 16px; }
+  .modal-body { color: #fff5d6; font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+  .result-card { background: linear-gradient(180deg, #8b6914 0%, #5c4410 100%); border: 2px solid #ffd86b; border-radius: 12px; padding: 16px; margin: 12px 0; }
+  .result-name { color: #fff5d6; font-size: 16px; font-weight: 700; }
+  .result-discount { color: #ffd86b; font-size: 22px; font-weight: 900; margin: 8px 0; }
+  .result-prob { color: #e8c985; font-size: 12px; }
+  .result-code { background: #0a0604; border: 1px dashed #d4af37; border-radius: 6px; padding: 8px; margin-top: 8px; font-family: monospace; color: #ffd86b; font-size: 13px; letter-spacing: 1px; }
+
+  /* Spinning animation */
+  @keyframes spinGlow { 0%, 100% { box-shadow: 0 0 20px rgba(255, 200, 80, 0.4); } 50% { box-shadow: 0 0 40px rgba(255, 200, 80, 0.9); } }
+  .spinning .card-inner { animation: spinGlow 0.4s ease-in-out infinite; }
+  .spinning .card { animation: cardWiggle 0.15s ease-in-out infinite; }
+  @keyframes cardWiggle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  /* Toast */
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #ffd86b; padding: 10px 20px; border-radius: 999px; border: 1px solid #d4af37; z-index: 200; font-size: 14px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="bg"></div>
+    <div class="vignette"></div>
+
+    <div class="header">
+      <div class="logo">
+        <div class="logo-title">周末咖啡补给站</div>
+        <div class="logo-sub">限时发放咖啡折扣券</div>
+      </div>
+      <div class="nav-btns">
+        <div class="nav-btn" data-action="rules">说明</div>
+        <div class="nav-btn" data-action="mine">我的</div>
+        <div class="nav-btn" data-action="rank">排行</div>
+        <div class="nav-btn" data-action="record">记录</div>
+      </div>
+    </div>
+
+    <div class="cards" id="cards">
+      <div class="card tier-outer arc-up" data-id="C1" data-name="基础券" data-discount="5元满减" data-prob="40" data-weight="40">
+        <div class="card-inner">
+          <div class="card-icon">☕</div>
+          <div class="card-name">基础券</div>
+          <div class="card-discount">5元<br>满减</div>
+          <div class="card-prob">40%</div>
+        </div>
+      </div>
+      <div class="card tier-mid" data-id="C3" data-name="经典券" data-discount="免费中杯美式" data-prob="15" data-weight="15">
+        <div class="card-inner">
+          <div class="card-icon">☕</div>
+          <div class="card-name">经典券</div>
+          <div class="card-discount">免费<br>中杯美式</div>
+          <div class="card-prob">15%</div>
+        </div>
+      </div>
+      <div class="card tier-center" data-id="C5" data-name="至尊券" data-discount="免费任意大杯" data-prob="5" data-weight="5">
+        <div class="card-inner">
+          <div class="card-icon">👑</div>
+          <div class="card-name">至尊券</div>
+          <div class="card-discount">免费<br>任意大杯</div>
+          <div class="card-prob">5%</div>
+        </div>
+      </div>
+      <div class="card tier-mid" data-id="C4" data-name="豪华券" data-discount="拿铁免费升杯" data-prob="10" data-weight="10">
+        <div class="card-inner">
+          <div class="card-icon">☕</div>
+          <div class="card-name">豪华券</div>
+          <div class="card-discount">拿铁<br>免费升杯</div>
+          <div class="card-prob">10%</div>
+        </div>
+      </div>
+      <div class="card tier-outer" data-id="C2" data-name="精品券" data-discount="8折优惠" data-prob="30" data-weight="30">
+        <div class="card-inner">
+          <div class="card-icon">☕</div>
+          <div class="card-name">精品券</div>
+          <div class="card-discount">8折<br>优惠</div>
+          <div class="card-prob">30%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="hint">✦ 再抽10次必得稀有折扣券 ✦</div>
+      <div class="actions">
+        <button class="btn btn-secondary" data-action="draw">抽1次</button>
+        <button class="btn btn-primary" data-action="invite">邀请好友增加抽奖次数</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">×</button>
+    <div class="modal-title" id="modalTitle">提示</div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== 5 coupons data =====
+  const COUPONS = [
+    { id: 'C1', name: '基础券', discount: '5元满减', prob: 40, weight: 40 },
+    { id: 'C3', name: '经典券', discount: '免费中杯美式', prob: 15, weight: 15 },
+    { id: 'C5', name: '至尊券', discount: '免费任意大杯', prob: 5, weight: 5 },
+    { id: 'C4', name: '豪华券', discount: '拿铁免费升杯', prob: 10, weight: 10 },
+    { id: 'C2', name: '精品券', discount: '8折优惠', prob: 30, weight: 30 },
+  ];
+
+  // ===== Modal helpers =====
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalBody = document.getElementById('modalBody');
+  const modalClose = document.getElementById('modalClose');
+  modalClose.onclick = () => modal.classList.remove('show');
+  modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
+
+  function showModal(title, body) {
+    modalTitle.textContent = title;
+    modalBody.innerHTML = body;
+    modal.classList.add('show');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ===== Card select =====
+  document.querySelectorAll('.card').forEach(card => {
+    card.onclick = () => {
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      const data = card.dataset;
+      showToast(`已选: ${data.name} (${data.discount})`);
+    };
+  });
+
+  // ===== Nav buttons =====
+  const navActions = {
+    rules: () => showModal('活动规则', `
+      <div style="text-align:left;font-size:13px;line-height:1.8">
+        <p>🎯 <b>活动说明</b></p>
+        <p>1. 活动期间每位用户每日可免费抽 1 次</p>
+        <p>2. 邀请好友可获得额外抽奖次数</p>
+        <p>3. 优惠券到店出示即可使用</p>
+        <p>4. 所有券码可在"我的"中查看</p>
+        <br>
+        <p style="color:#ffd86b">📅 活动有效期至 2026-06-30</p>
+      </div>
+    `),
+    mine: () => {
+      const userCoupons = JSON.parse(localStorage.getItem('myCoupons') || '[]');
+      const list = userCoupons.length === 0
+        ? '<p style="color:#888">还没有抽到券哦，快去抽奖吧～</p>'
+        : userCoupons.map(c => `<div style="background:rgba(212,175,55,0.1);padding:8px;margin:6px 0;border-radius:6px;text-align:left">
+            <b style="color:#ffd86b">${c.name}</b> · ${c.discount} · <span style="font-family:monospace;font-size:11px">${c.code}</span>
+          </div>`).join('');
+      showModal('我的优惠券', list);
+    },
+    rank: () => showModal('排行榜', `
+      <div style="text-align:left;font-size:13px">
+        <p>🥇 <b>本周 TOP 5</b></p>
+        <p style="margin:8px 0">1. 用户 9527 · 抽中 23 张至尊券</p>
+        <p style="margin:8px 0">2. 用户 8821 · 抽中 19 张</p>
+        <p style="margin:8px 0">3. 用户 7766 · 抽中 17 张</p>
+        <p style="margin:8px 0">4. 用户 6234 · 抽中 15 张</p>
+        <p style="margin:8px 0">5. 用户 5102 · 抽中 12 张</p>
+      </div>
+    `),
+    record: () => {
+      const records = JSON.parse(localStorage.getItem('drawHistory') || '[]');
+      const list = records.length === 0
+        ? '<p style="color:#888">暂无抽奖记录</p>'
+        : records.slice(0, 10).map(r => `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(212,175,55,0.2);display:flex;justify-content:space-between">
+            <span>${r.time}</span><span style="color:#ffd86b">${r.name}</span>
+          </div>`).join('');
+      showModal('抽奖记录', list);
+    }
+  };
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => navActions[btn.dataset.action]();
+  });
+
+  // ===== Draw =====
+  function doDraw() {
+    // Weighted random
+    const totalWeight = COUPONS.reduce((sum, c) => sum + c.weight, 0);
+    let rand = Math.random() * totalWeight;
+    let selected = COUPONS[0];
+    for (const c of COUPONS) {
+      rand -= c.weight;
+      if (rand <= 0) { selected = c; break; }
+    }
+
+    // Animate
+    const cards = document.getElementById('cards');
+    cards.classList.add('spinning');
+    setTimeout(() => {
+      cards.classList.remove('spinning');
+      // Highlight selected
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+      const target = document.querySelector(`.card[data-id="${selected.id}"]`);
+      if (target) target.classList.add('selected');
+
+      // Generate mock code
+      const code = `COFFEE-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      selected.code = code;
+
+      // Save
+      const userCoupons = JSON.parse(localStorage.getItem('myCoupons') || '[]');
+      userCoupons.push(selected);
+      localStorage.setItem('myCoupons', JSON.stringify(userCoupons));
+
+      const records = JSON.parse(localStorage.getItem('drawHistory') || '[]');
+      records.unshift({ time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), name: selected.name });
+      localStorage.setItem('drawHistory', JSON.stringify(records));
+
+      // Show result
+      const isRare = selected.weight <= 10;
+      showModal(isRare ? '🎉 恭喜抽中稀有券！' : '✨ 抽中优惠券', `
+        <div class="result-card">
+          <div class="result-name">${selected.name}</div>
+          <div class="result-discount">${selected.discount}</div>
+          <div class="result-prob">中奖概率 ${selected.prob}%</div>
+          <div class="result-code">${code}</div>
+        </div>
+        <p style="font-size:12px;color:#aaa;margin-top:8px">券码已保存到"我的"</p>
+      `);
+    }, 1500);
+  }
+
+  // ===== Bottom buttons =====
+  document.querySelector('[data-action="draw"]').onclick = doDraw;
+  document.querySelector('[data-action="invite"]').onclick = () => {
+    const inviteLink = `${location.origin}${location.pathname}?invite=demo123`;
+    showModal('邀请好友', `
+      <p style="margin-bottom:12px">复制链接发给好友，双方各得 +1 次抽奖机会</p>
+      <div class="result-code" style="user-select:all;-webkit-user-select:all;cursor:pointer" onclick="navigator.clipboard.writeText('${inviteLink}');showToast('链接已复制！')">${inviteLink}</div>
+      <p style="font-size:12px;color:#aaa;margin-top:8px">点击链接即可复制</p>
+    `);
+  };
+</script>
+
+</body>
+</html>
