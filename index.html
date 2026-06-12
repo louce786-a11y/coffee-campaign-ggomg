@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
 <title>周末咖啡补给站</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -26,7 +27,8 @@
   .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%); pointer-events: none; z-index: 2; }
 
   /* === 动画 3: 咖啡杯口蒸汽粒子 === */
-  .steam-container { position: absolute; left: 50%; top: 35%; transform: translateX(-50%); width: 60px; height: 80px; pointer-events: none; z-index: 3; }
+  /* 蒸汽位置: 背景里咖啡杯大约在左下 60%/72% 位置, 蒸汽就贴这儿 */
+  .steam-container { position: absolute; left: 58%; top: 68%; transform: translateX(-50%); width: 50px; height: 60px; pointer-events: none; z-index: 3; opacity: 0.85; }
   .steam { position: absolute; bottom: 0; left: 50%; width: 6px; height: 6px; background: rgba(255, 240, 220, 0.7); border-radius: 50%; filter: blur(3px); transform: translateX(-50%); animation: steamRise 3s ease-out infinite; opacity: 0; }
   .steam:nth-child(1) { animation-delay: 0s; }
   .steam:nth-child(2) { animation-delay: 0.6s; left: 40%; }
@@ -60,6 +62,12 @@
   @keyframes floatC { 0%, 100% { transform: translateY(-22px); } 50% { transform: translateY(-10px); } }
 
   .cards { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-10%); height: 32%; display: flex; align-items: flex-end; justify-content: center; gap: 1.2%; padding: 0 3%; z-index: 4; pointer-events: none; }
+  /* === 弧形布局: 中间高, 两边低 === */
+  .card[data-id="C1"] { margin-bottom: 14%; }
+  .card[data-id="C2"] { margin-bottom: 14%; }
+  .card[data-id="C3"] { margin-bottom: 7%;  }
+  .card[data-id="C4"] { margin-bottom: 7%;  }
+  .card[data-id="C5"] { margin-bottom: 0%;  }
   .card { position: relative; pointer-events: auto; cursor: pointer; transition: transform 0.2s, filter 0.2s; flex-shrink: 0; opacity: 0; animation: cardEnter 0.6s ease-out forwards, floatA 3.5s 1.5s ease-in-out infinite; }
   .card[data-id="C1"] { animation-delay: 0.4s, 0s; }
   .card[data-id="C3"] { animation: cardEnter 0.6s 0.6s ease-out forwards, floatB 3.5s 0.5s ease-in-out infinite; }
@@ -164,7 +172,7 @@
 
   .slot-reel { display: flex; height: 100%; will-change: transform; }
   .slot-reel.fast { transition: transform 0.15s linear; }
-  .slot-reel.spinning { transition: transform 4s cubic-bezier(0.12, 0.85, 0.25, 1); }
+  .slot-reel.spinning { transition: transform 2.6s cubic-bezier(0.15, 0.95, 0.3, 1); }
 
   .slot-card { flex-shrink: 0; width: min(82vw, 320px); height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8% 4%; position: relative; }
   .slot-card .card-icon { font-size: clamp(40px, 12vw, 64px); margin-bottom: 4%; }
@@ -240,7 +248,7 @@
         <div class="card-inner">
           <div class="card-icon">☕</div>
           <div class="card-name">基础券</div>
-          <div class="card-discount">5元<br>满减</div>
+          <div class="card-discount">5元<br>满减券</div>
           <div class="card-prob">40%</div>
         </div>
       </div>
@@ -272,14 +280,14 @@
         <div class="card-inner">
           <div class="card-icon">☕</div>
           <div class="card-name">精品券</div>
-          <div class="card-discount">8折<br>优惠</div>
+          <div class="card-discount">8折<br>全场咖啡</div>
           <div class="card-prob">30%</div>
         </div>
       </div>
     </div>
 
     <div class="footer">
-      <div class="hint">✦ 再抽10次必得稀有折扣券 ✦</div>
+      <div class="hint" id="hint">✦ 试试手气, 稀有券等你带回家 ✦</div>
       <div class="actions">
         <button class="btn btn-secondary" data-action="draw">抽1次</button>
         <button class="btn btn-primary" data-action="invite">邀请好友增加抽奖次数</button>
@@ -307,15 +315,26 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
-  // ===== 5 coupons data =====
-  const COUPONS = [
-    { id: 'C1', name: '基础券', discount: '5元满减', prob: 40, weight: 40 },
-    { id: 'C3', name: '经典券', discount: '免费中杯美式', prob: 15, weight: 15 },
-    { id: 'C5', name: '至尊券', discount: '免费任意大杯', prob: 5, weight: 5 },
-    { id: 'C4', name: '豪华券', discount: '拿铁免费升杯', prob: 10, weight: 10 },
-    { id: 'C2', name: '精品券', discount: '8折优惠', prob: 30, weight: 30 },
-  ];
+<script type="module">
+  import {
+    COUPONS, ARC_ORDER, RARE_WEIGHT_THRESHOLD, DAILY_FREE_DRAWS,
+    weightedPick, PityCounter, DailyLimit, SlotLayout,
+  } from './game.js';
+
+  // === 画卡 + 老虎机渲染用的工具 ===
+  const tierOf = (id) => id === 'C5' ? 'tier-center'
+                       : (id === 'C1' || id === 'C2') ? 'tier-outer'
+                       : 'tier-mid';
+
+  // === localStorage 封装 ===
+  const LS_COUPONS = 'myCoupons';
+  const LS_HISTORY = 'drawHistory';
+  const LS_LIMIT   = 'drawLimit_v1'; // DailyLimit.key
+  const LS_PITY    = 'pityState_v1';
+  const store = {
+    get: (k, def) => { try { return JSON.parse(localStorage.getItem(k) || JSON.stringify(def)); } catch { return def; } },
+    set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  };
 
   // ===== Modal helpers =====
   const modal = document.getElementById('modal');
@@ -353,8 +372,8 @@
     rules: () => showModal('活动规则', `
       <div style="text-align:left;font-size:13px;line-height:1.8">
         <p>🎯 <b>活动说明</b></p>
-        <p>1. 活动期间每位用户每日可免费抽 1 次</p>
-        <p>2. 邀请好友可获得额外抽奖次数</p>
+        <p>1. 活动期间每位用户每日可免费抽 ${DAILY_FREE_DRAWS} 次</p>
+        <p>2. 连抽 10 次未出稀有, 第 10 次保底出稀有</p>
         <p>3. 优惠券到店出示即可使用</p>
         <p>4. 所有券码可在"我的"中查看</p>
         <br>
@@ -362,10 +381,10 @@
       </div>
     `),
     mine: () => {
-      const userCoupons = JSON.parse(localStorage.getItem('myCoupons') || '[]');
+      const userCoupons = store.get(LS_COUPONS, []);
       const list = userCoupons.length === 0
         ? '<p style="color:#888">还没有抽到券哦，快去抽奖吧～</p>'
-        : userCoupons.map(c => `<div style="background:rgba(212,175,55,0.1);padding:8px;margin:6px 0;border-radius:6px;text-align:left">
+        : userCoupons.slice().reverse().map(c => `<div style="background:rgba(212,175,55,0.1);padding:8px;margin:6px 0;border-radius:6px;text-align:left">
             <b style="color:#ffd86b">${c.name}</b> · ${c.discount} · <span style="font-family:monospace;font-size:11px">${c.code}</span>
           </div>`).join('');
       showModal('我的优惠券', list);
@@ -378,14 +397,15 @@
         <p style="margin:8px 0">3. 用户 7766 · 抽中 17 张</p>
         <p style="margin:8px 0">4. 用户 6234 · 抽中 15 张</p>
         <p style="margin:8px 0">5. 用户 5102 · 抽中 12 张</p>
+        <p style="color:#888;font-size:11px;margin-top:8px">（演示数据）</p>
       </div>
     `),
     record: () => {
-      const records = JSON.parse(localStorage.getItem('drawHistory') || '[]');
+      const records = store.get(LS_HISTORY, []);
       const list = records.length === 0
         ? '<p style="color:#888">暂无抽奖记录</p>'
         : records.slice(0, 10).map(r => `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid rgba(212,175,55,0.2);display:flex;justify-content:space-between">
-            <span>${r.time}</span><span style="color:#ffd86b">${r.name}</span>
+            <span>${r.time}</span><span style="color:#ffd86b">${r.name}${r.rare ? ' 🏆' : ''}</span>
           </div>`).join('');
       showModal('抽奖记录', list);
     }
@@ -395,154 +415,120 @@
     btn.onclick = () => navActions[btn.dataset.action]();
   });
 
+  // ===== Pity 状态恢复 =====
+  const pity = new PityCounter();
+  const savedPity = store.get(LS_PITY, null);
+  if (savedPity) pity.sinceRare = savedPity.sinceRare || 0;
+
+  // ===== 剩余次数提示 =====
+  const hintEl = document.getElementById('hint');
+  function refreshHint() {
+    const state = store.get(LS_LIMIT, {});
+    const left = DailyLimit.remaining(state);
+    if (left > 0) {
+      hintEl.textContent = `✦ 今日还剩 ${left} 次免费抽奖 · 连 10 抽保底出稀有 ✦`;
+    } else {
+      hintEl.textContent = '✦ 今日免费次数用完 · 邀请好友可获得额外次数 ✦';
+    }
+  }
+  refreshHint();
+
   // ===== Draw (Slot Machine) =====
   let slotBusy = false;
   function doDraw() {
     if (slotBusy) return;
+    // 限次检查
+    const limitState = store.get(LS_LIMIT, {});
+    const left = DailyLimit.remaining(limitState);
+    if (left <= 0) {
+      showModal('明天再来 ☕', `
+        <p>今日 ${DAILY_FREE_DRAWS} 次免费抽奖已用完</p>
+        <p style="color:#aaa;font-size:12px;margin-top:8px">邀请好友可获得额外次数</p>
+      `);
+      return;
+    }
     slotBusy = true;
 
-    // Weighted random pick
-    const totalWeight = COUPONS.reduce((sum, c) => sum + c.weight, 0);
-    let rand = Math.random() * totalWeight;
-    let selected = COUPONS[0];
-    for (const c of COUPONS) {
-      rand -= c.weight;
-      if (rand <= 0) { selected = c; break; }
-    }
+    // === 抽奖计算 (纯逻辑) ===
+    const expected = weightedPick();
+    const selected = pity.apply(expected);
+    store.set(LS_PITY, pity.state);
 
     const overlay = document.getElementById('slotOverlay');
     const reel = document.getElementById('slotReel');
     const tick = document.getElementById('slotTick');
 
-    // Build reel: 8 cycles of 5 = 40 cards
-    // The winning card is placed at index 35 (last full cycle) so we have 8 rotations
-    // We need to place winner somewhere predictable.
-    // Approach: have 40 cards where position 35 is the winner
-    const TOTAL = 40;
-    const selectedIdx = COUPONS.findIndex(c => c.id === selected.id);
-    // Place winner at position 35 + selectedIdx in a custom order
-    // Actually simpler: cycle through COUPONS, but the LAST 5 positions are arranged so the winner is at position 35 (which is the 35th card)
-    // Total cards = 5 * 7 + 5 = 40, with the last 5 in the order: ... selected ... cycle
-    // Best: build it as 7 full cycles of 5 + 5 extra = 40 cards, where card 35-39 are: pick a pattern
-
-    // I'll do: cards 0-34 = 7 full cycles of COUPONS in arc order (C1 C3 C5 C4 C2)
-    // Wait - the visible card ordering in slot should match the arc: C1 C3 C5 C4 C2
-    // Actually for slot machine, the order doesn't matter for fairness, but visually let's match arc
-    // Let me use a simpler approach: 40 cards = 8 cycles of COUPONS in order, with the winning one placed at the right position
-    // Order: just use COUPONS in original order (C1, C3, C5, C4, C2)
-    const arcOrder = ['C1', 'C3', 'C5', 'C4', 'C2']; // matches our arc layout
-    const orderedCoupons = arcOrder.map(id => COUPONS.find(c => c.id === id));
-
-    // Build 40 cards
+    // === 用 SlotLayout 生成 reel ===
+    const ids = SlotLayout.build(selected.id);
     reel.innerHTML = '';
-    for (let i = 0; i < TOTAL; i++) {
-      const c = orderedCoupons[i % 5];
+    ids.forEach(id => {
+      const c = COUPONS.find(x => x.id === id);
       const cardEl = document.createElement('div');
-      const tier = c.id === 'C5' ? 'tier-center' : (c.id === 'C1' || c.id === 'C2') ? 'tier-outer' : 'tier-mid';
-      cardEl.className = 'slot-card ' + tier;
+      cardEl.className = 'slot-card ' + tierOf(id);
       cardEl.innerHTML = `
         <div class="card-name">${c.name}</div>
-        <div class="card-icon">${c.id === 'C5' ? '👑' : '☕'}</div>
+        <div class="card-icon">${id === 'C5' ? '👑' : '☕'}</div>
         <div class="card-discount">${c.discount}</div>
         <div class="card-prob">概率 ${c.prob}%</div>
       `;
       reel.appendChild(cardEl);
-    }
+    });
 
-    // The card at position 35 is COUPONS[35 % 5] = COUPONS[0] = C1
-    // We want selected.id to be in the center, which means position 35 should map to selected.id
-    // But position 35 is C1. So we need to shift.
-    // Better: use a custom arrangement for the last 5 cards so winner is at position 35
-    // Easiest: rearrange the last 5 cards in the reel
-    const last5 = reel.querySelectorAll('.slot-card:nth-last-child(-n+5)'); // last 5 elements
-    // Wait, positions are: 35, 36, 37, 38, 39 (0-indexed)
-    // In COUPONS order, position 35 = C1, 36 = C3, 37 = C5, 38 = C4, 39 = C2
-    // We want position 35 to be selected. So we need to rotate the last 5 cards.
-    // Find the index in arcOrder
-    const winnerInOrder = arcOrder.indexOf(selected.id);
-    // Rotate the last 5 cards by -winnerInOrder
-    // (so that the card that was at position 35+winnerInOrder is now at position 35)
-    // We can do this by reordering: the card that should be at position 35+k is the one currently at position 35+((k+winnerInOrder)%5)
-    const last5Arr = Array.from(last5);
-    const newLast5 = new Array(5);
-    for (let k = 0; k < 5; k++) {
-      newLast5[k] = last5Arr[(k + winnerInOrder) % 5];
-    }
-    // Remove and re-append in new order
-    last5Arr.forEach(el => el.remove());
-    newLast5.forEach(el => reel.appendChild(el));
-
-    // Now position 35 has the winning card.
-    // We want the reel to translate so card 35 is centered.
-    // Reel translateX: -(35 * cardWidth) to put card 35 at left edge of frame
-    // To center it, we add frameWidth/2 - cardWidth/2
-    // But our card width = frame width, so just -(35 * cardWidth)
-    // Wait: 1 card = 1 frame. So card N starts at x = N * cardWidth in reel.
-    // To show card 35, we shift reel left by 35 * cardWidth.
-
-    // Show overlay
     overlay.classList.add('show');
     tick.textContent = '准备中...';
     document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
 
-    // Phase 1: fast loop for visual "spin up" (200ms)
+    // === Phase 1: fast loop (0.4s, 5 张) ===
     reel.classList.add('fast');
     reel.classList.remove('spinning');
     let fastOffset = 0;
+    const cardWidthHint = reel.children[0].offsetWidth || 320;
     const fastAnim = setInterval(() => {
-      fastOffset -= 320; // shift 1 card each tick
+      fastOffset -= cardWidthHint;
       reel.style.transform = `translateX(${fastOffset}px)`;
     }, 80);
+    setTimeout(() => clearInterval(fastAnim), 480);
 
-    // Phase 2: real spin to winner
+    // === Phase 2: 减速到 winner (2.6s, 紧凑型) ===
     setTimeout(() => {
-      clearInterval(fastAnim);
       tick.textContent = '抽奖中...';
-
-      // Calculate final position
-      // Total cards: 40. Winner at index 35. Card width = frame width.
-      // Reel should be at -35 * cardWidth to center winner.
-      // Add a tiny random offset (-10 to +10) so it doesn't always land at exact pixel.
       const cardWidth = reel.children[0].offsetWidth;
-      const finalOffset = -(35 * cardWidth) + (Math.random() - 0.5) * 16;
-
-      // Use slower easing for the main spin
+      const finalOffset = SlotLayout.finalOffset(cardWidth); // 精准停, 无随机偏移
       reel.classList.remove('fast');
       reel.classList.add('spinning');
-      // Force reflow
       void reel.offsetWidth;
       reel.style.transform = `translateX(${finalOffset}px)`;
-    }, 600);
+    }, 520);
 
-    // Phase 3: end — show result
+    // === Phase 3: 停卡 + 落幕 (3.4s 总) ===
     setTimeout(() => {
       tick.textContent = '🎉 抽奖结果';
-      // Generate code
       const code = `COFFEE-${Date.now().toString(36).toUpperCase().slice(-6)}`;
       selected.code = code;
 
-      // Save
-      const userCoupons = JSON.parse(localStorage.getItem('myCoupons') || '[]');
-      userCoupons.push(selected);
-      localStorage.setItem('myCoupons', JSON.stringify(userCoupons));
+      // 持久化
+      const userCoupons = store.get(LS_COUPONS, []);
+      userCoupons.push({ ...selected, code, time: Date.now() });
+      store.set(LS_COUPONS, userCoupons);
 
-      const records = JSON.parse(localStorage.getItem('drawHistory') || '[]');
-      records.unshift({ time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), name: selected.name });
-      localStorage.setItem('drawHistory', JSON.stringify(records));
+      const records = store.get(LS_HISTORY, []);
+      records.unshift({ time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), name: selected.name, rare: selected.rare });
+      store.set(LS_HISTORY, records);
 
-      // Hide slot
+      // 消耗一次抽奖次数
+      DailyLimit.consume(limitState);
+      store.set(LS_LIMIT, limitState);
+      refreshHint();
+
       setTimeout(() => {
         overlay.classList.remove('show');
-        // Reset reel
         reel.style.transition = 'none';
         reel.style.transform = 'translateX(0)';
         setTimeout(() => { reel.style.transition = ''; }, 50);
 
-        // Show result modal
-        const isRare = selected.weight <= 10;
-        showModal(isRare ? '🎉 恭喜抽中稀有券！' : '✨ 抽中优惠券', `
+        showModal(selected.rare ? '🎉 恭喜抽中稀有券！' : '✨ 抽中优惠券', `
           <div class="result-card">
-            <div class="result-name">${selected.name}</div>
+            <div class="result-name">${selected.name}${selected.rare ? ' 🏆' : ''}</div>
             <div class="result-discount">${selected.discount}</div>
             <div class="result-prob">中奖概率 ${selected.prob}%</div>
             <div class="result-code">${code}</div>
@@ -550,11 +536,10 @@
           <p style="font-size:12px;color:#aaa;margin-top:8px">券码已保存到"我的"</p>
         `);
 
-        // Confetti
-        spawnConfetti(isRare ? 50 : 25);
+        spawnConfetti(selected.rare ? 50 : 25);
         slotBusy = false;
-      }, 1200);
-    }, 4800);
+      }, 900);
+    }, 3500); // 0.52 + 2.6 + 0.4 = 3.5s, 从原来 5.8s 砍到 3.5s
   }
 
   // === 礼花粒子 ===
@@ -583,9 +568,12 @@
     showModal('邀请好友', `
       <p style="margin-bottom:12px">复制链接发给好友，双方各得 +1 次抽奖机会</p>
       <div class="result-code" style="user-select:all;-webkit-user-select:all;cursor:pointer" onclick="navigator.clipboard.writeText('${inviteLink}');showToast('链接已复制！')">${inviteLink}</div>
-      <p style="font-size:12px;color:#aaa;margin-top:8px">点击链接即可复制</p>
+      <p style="font-size:11px;color:#f38181;margin-top:8px">⚠️ 演示链接, 未接入真实邀请追踪</p>
     `);
   };
+
+  // === 调试钩子 (开发用) ===
+  window.__campaign = { pity, store, COUPONS, refreshHint, resetLimit: () => { store.set(LS_LIMIT, {}); store.set(LS_PITY, { sinceRare: 0 }); pity.sinceRare = 0; refreshHint(); } };
 </script>
 
 </body>
